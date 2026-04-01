@@ -74,10 +74,17 @@ with col3:
 with col4:
     timeline = st.selectbox("Timeline", ["morning", "afternoon", "evening"])
 
+col5, col6 = st.columns(2)
+with col5:
+    task_time = st.time_input("Time", value=None)
+with col6:
+    recurrence = st.selectbox("Recurrence", ["none", "daily", "weekly"])
+
 if st.button("Add task"):
     # Map priority string to integer (1 = high, 2 = medium, 3 = low)
     priority_map = {"high": 1, "medium": 2, "low": 3}
     prio_int = priority_map[priority_str]
+    time_str = task_time.strftime("%H:%M") if task_time else "00:00"
     
     # Create the task object
     new_task = Task(
@@ -85,21 +92,23 @@ if st.button("Add task"):
         task_type="activity",
         priority=prio_int,
         duration=int(duration),
-        timeline=timeline
+        timeline=timeline,
+        time=time_str,
+        recurrence=recurrence
     )
     
     # Assuming the first pet is selected for now
     st.session_state.owner.pets[0].add_task(new_task)
     st.success(f"Added '{task_title}' to {st.session_state.owner.pets[0].pet_name}'s tasks!")
 
-all_tasks = st.session_state.owner.get_all_tasks()
+all_tasks = st.session_state.owner.get_tasks_by_status("pending")
 if all_tasks:
-    st.write(f"Current tasks for {st.session_state.owner.pets[0].pet_name}:")
-    # Display tasks elegantly from objects
-    task_data = [{"Name": t.name, "Duration": t.duration, "Priority": t.priority, "Timeline": t.timeline} for t in all_tasks]
+    st.write(f"Current pending tasks for {st.session_state.owner.pets[0].pet_name}:")
+    # Display tasks elegantly from objects using the internal filtering capability
+    task_data = [{"Name": t.name, "Time": t.time, "Duration": f"{t.duration}m", "Priority": t.priority, "Timeline": t.timeline.capitalize(), "Recurrence": t.recurrence.capitalize()} for t in all_tasks]
     st.table(task_data)
 else:
-    st.info("No tasks yet. Add one above.")
+    st.info("No pending tasks yet. Add one above.")
 
 st.divider()
 
@@ -120,13 +129,25 @@ if st.button("Generate schedule"):
         st.success("Plan generated successfully!")
         
         # Display the explanation
-        st.markdown(f"**Planner Summary:** {plan.explanation}")
+        st.markdown(f"### Planner Summary \n> {plan.explanation}")
         
+        # Output any conflict detection alerts straight into the UI 
+        if getattr(plan, "warnings", []):
+            st.markdown("#### 🚨 Scheduling Warnings")
+            for w in plan.warnings:
+                st.warning(w)
+
         # Display schedule
+        st.markdown("### 🐾 Daily Breakdown")
         for time_period, tasks in plan.schedule.items():
-            st.write(f"**{time_period.capitalize()}**")
+            st.divider()
+            st.subheader(f"{time_period.capitalize()}")
             if not tasks:
                 st.write("*No tasks scheduled.*")
             else:
-                for t in tasks:
-                    st.write(f"- {t.name} ({t.duration} min) - Priority {t.priority}")
+                # Neatly utilize the time sorting logic built previously in the backend!
+                sorted_timeline_tasks = scheduler.sort_by_time(tasks)
+                for t in sorted_timeline_tasks:
+                    star = "★" if t.priority == 1 else "▪"
+                    st.write(f"**{star} {t.time} - {t.name}**")
+                    st.caption(f"⏱ *{t.duration} min* | 🔄 *{t.recurrence.title()}*")

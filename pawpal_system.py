@@ -209,3 +209,93 @@ class Scheduler:
             conflicts=conflicts,
             warnings=time_warnings
         )
+
+
+def test_recurring_tasks():
+    """Test that recurring tasks generate new pending tasks with correct dates."""
+    base_date = date.today()
+    
+    # 1. Happy path: Daily recurrence
+    daily_task = Task("Meds", "health", 1, 5, "morning", time="09:00", recurrence="daily", due_date=base_date)
+    new_daily = daily_task.mark_complete()
+    assert daily_task.status == "completed"
+    assert new_daily is not None
+    assert new_daily.status == "pending"
+    assert new_daily.due_date == base_date + timedelta(days=1)
+    
+    # 2. Case-insensitivity and weekly recurrence
+    weekly_task = Task("Groom", "grooming", 2, 30, "afternoon", recurrence="WeEkLy", due_date=base_date)
+    new_weekly = weekly_task.mark_complete()
+    assert new_weekly.due_date == base_date + timedelta(days=7)
+    
+    # 3. Edge case: No recurrence
+    one_off_task = Task("Vet", "health", 1, 60, "morning", recurrence="none")
+    assert one_off_task.mark_complete() is None
+
+def test_filtering_edge_cases():
+    """Test owner filtering by status and pet name, including case insensitivity and empty states."""
+    owner = Owner("Jordan")
+    pet1 = Pet("Jordan", "Mochi", "Dog", 3, "")
+    pet2 = Pet("Jordan", "LuNa", "Cat", 5, "")
+    owner.add_pet(pet1)
+    owner.add_pet(pet2)
+    
+    t1 = Task("Walk", "activity", 1, 20, "morning", status="pending")
+    t2 = Task("Feed", "food", 1, 5, "morning", status="COMPLETED") # Edge case: uppercase status
+    
+    pet1.add_task(t1)
+    pet2.add_task(t2)
+    
+    # Filtering by pet name (case-insensitive)
+    assert len(owner.get_tasks_by_pet("mochi")) == 1
+    assert len(owner.get_tasks_by_pet("LUNA")) == 1
+    
+    # Filtering by pet name that doesn't exist (Edge case)
+    assert len(owner.get_tasks_by_pet("AirBud")) == 0
+    
+    # Filtering by status (case-insensitive)
+    assert len(owner.get_tasks_by_status("PENDING")) == 1
+    assert len(owner.get_tasks_by_status("completed")) == 1
+
+def test_scheduler_sorting():
+    """Test that the scheduler correctly sorts string times chronologically."""
+    scheduler = Scheduler({"morning": 60})
+    
+    tasks = [
+        Task("Lunch", "feed", 2, 10, "afternoon", time="13:00"),
+        Task("Morning Walk", "walk", 1, 30, "morning", time="08:30"),
+        Task("Late Night", "potty", 3, 5, "evening", time="23:15"),
+        Task("Breakfast", "feed", 1, 5, "morning", time="07:00")
+    ]
+    
+    sorted_tasks = scheduler.sort_by_time(tasks)
+    
+    assert sorted_tasks[0].name == "Breakfast"
+    assert sorted_tasks[1].name == "Morning Walk"
+    assert sorted_tasks[2].name == "Lunch"
+    assert sorted_tasks[3].name == "Late Night"
+
+def test_scheduler_conflict_detection():
+    """Test lightweight scheduling conflict detection for same-time occurrences."""
+    scheduler = Scheduler({"morning": 100})
+    
+    # 0 conflicts
+    safe_tasks = [
+        Task("T1", "t", 1, 10, "morning", time="08:00"),
+        Task("T2", "t", 1, 10, "morning", time="09:00")
+    ]
+    assert len(scheduler.check_time_conflicts(safe_tasks)) == 0
+    
+    # 2 conflicts at the same exact time
+    conflict_tasks = [
+        Task("Feed Dog", "feed", 1, 10, "morning", time="08:00"),
+        Task("Walk Dog", "walk", 2, 20, "morning", time="08:00"),
+        Task("Feed Cat", "feed", 1, 5, "morning", time="08:00"),
+        Task("Groom", "groom", 3, 30, "evening", time="19:00")
+    ]
+    
+    warnings = scheduler.check_time_conflicts(conflict_tasks)
+    assert len(warnings) == 1
+    assert "08:00" in warnings[0]
+    assert "Feed Dog" in warnings[0]
+    assert "Feed Cat" in warnings[0]
