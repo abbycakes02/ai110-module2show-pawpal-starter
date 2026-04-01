@@ -12,6 +12,14 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 
 Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
 
+## Smarter Scheduling
+
+Our updated backend includes numerous quality-of-life and algorithmic refactors to improve schedule usability:
+- **String Filtering**: Safely retrieve tasks by Completion Status (Completed/Pending) or precisely by Pet Name directly from an `Owner`'s dataset.
+- **Smart Sorting**: Uses inline lambda properties to accurately parse time strings chronologically rather than sequentially placing random assignments on the schedule.
+- **Lightweight Conflict Check**: Checks time parameters for overlapping entries across both a single pet and an owner's entire household, outputting accessible, non-crashing `.warning` messages instead of failing the compiler.
+- **Recurring Engine**: Re-queues tasks flagged as `"daily"` or `"weekly"` by deeply cloning the finished element, creating a new `"pending"` task, and advancing Python's `timedelta()` parameter by either 1 day or 7 days natively.
+
 ## What you will build
 
 Your final app should:

@@ -1,4 +1,5 @@
 import streamlit as st
+from pawpal_system import Task, Pet, Owner, Scheduler, Plan
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -49,40 +50,83 @@ st.caption("Add a few tasks. In your final version, these should feed into your 
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
 
-col1, col2, col3 = st.columns(3)
+# Initialize an Owner in session state if it doesn't exist
+if "owner" not in st.session_state:
+    # Create the default owner and a default pet based on the UI inputs
+    default_owner = Owner(name="Jordan")
+    default_pet = Pet(
+        owner_name="Jordan",
+        pet_name="Mochi",
+        pet_type="dog",
+        age=3,
+        health_notes="None"
+    )
+    default_owner.add_pet(default_pet)
+    st.session_state.owner = default_owner
+
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     task_title = st.text_input("Task title", value="Morning walk")
 with col2:
     duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
 with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+    priority_str = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+with col4:
+    timeline = st.selectbox("Timeline", ["morning", "afternoon", "evening"])
 
 if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
+    # Map priority string to integer (1 = high, 2 = medium, 3 = low)
+    priority_map = {"high": 1, "medium": 2, "low": 3}
+    prio_int = priority_map[priority_str]
+    
+    # Create the task object
+    new_task = Task(
+        name=task_title,
+        task_type="activity",
+        priority=prio_int,
+        duration=int(duration),
+        timeline=timeline
     )
+    
+    # Assuming the first pet is selected for now
+    st.session_state.owner.pets[0].add_task(new_task)
+    st.success(f"Added '{task_title}' to {st.session_state.owner.pets[0].pet_name}'s tasks!")
 
-if st.session_state.tasks:
-    st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+all_tasks = st.session_state.owner.get_all_tasks()
+if all_tasks:
+    st.write(f"Current tasks for {st.session_state.owner.pets[0].pet_name}:")
+    # Display tasks elegantly from objects
+    task_data = [{"Name": t.name, "Duration": t.duration, "Priority": t.priority, "Timeline": t.timeline} for t in all_tasks]
+    st.table(task_data)
 else:
     st.info("No tasks yet. Add one above.")
 
 st.divider()
 
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+st.caption("Generates a structured plan taking constraints into account.")
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    if not all_tasks:
+        st.warning("Please add some tasks first!")
+    else:
+        # Define constraints (e.g. from UI sliders if you want, or hardcoded for now)
+        constraints = {"morning": 60, "afternoon": 60, "evening": 60}
+        scheduler = Scheduler(owner_time_constraints=constraints)
+        
+        # Generate the plan
+        plan = scheduler.generate_plan(st.session_state.owner)
+        
+        st.success("Plan generated successfully!")
+        
+        # Display the explanation
+        st.markdown(f"**Planner Summary:** {plan.explanation}")
+        
+        # Display schedule
+        for time_period, tasks in plan.schedule.items():
+            st.write(f"**{time_period.capitalize()}**")
+            if not tasks:
+                st.write("*No tasks scheduled.*")
+            else:
+                for t in tasks:
+                    st.write(f"- {t.name} ({t.duration} min) - Priority {t.priority}")
