@@ -2,6 +2,10 @@
 
 You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
 
+## 📸 Demo
+
+<a href="/course_images/ai110/Screenshot 2026-03-31 at 11.47.54 PM.png" target="_blank"><img src='/course_images/ai110/Screenshot 2026-03-31 at 11.47.54 PM.png' /></a>
+
 ## Scenario
 
 A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
